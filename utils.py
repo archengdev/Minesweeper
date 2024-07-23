@@ -13,15 +13,28 @@ class Coord:
     x: int
     y: int
 
+BOMB = -2
+COVERED = -1
+BLANK = 0
+
 class Tile:
+    def __init__(self):
+        self.value = -1
+        self.loc = Coord()
+        self.checked = False
+        self.covered = True
     loc: Coord
     value: int # -2 = bomb, -1 = covered, 0 = blank, number is number
     covered: bool
     checked: bool
 
-mode = 'easy_half'
-# mode = 'hard_full'
+# prompt user to choose mode
+# mode = pyautogui.prompt("easy_half or hard_full")
+# mode = 'easy_half'
+mode = 'hard_full'
 
+
+# set pixel locations. using 2560x1440, 125% scale
 if mode == 'hard_full':
     LEN = 24
     HEIGHT = 20
@@ -56,11 +69,11 @@ def print_board(board):
     for j in range(HEIGHT):
         for i in range(LEN):
             val = board[j][i].value
-            if val == -2:
+            if val == BOMB:
                 rep = 'X'
-            elif val == -1:
+            elif val == COVERED:
                 rep = '-'
-            elif val == 0:
+            elif val == BLANK:
                 rep = ' '
             else: 
                 rep = val
@@ -137,18 +150,19 @@ def check_num(loc, img):
 # initialize board with coords (a 2D array of Tiles)
 def init_board():
     """
-    test
+    returns a board, a 2D array of tiles, with each tile having its location
+    set to the correct pixel location
     """
+
+    # create the board
     board = [[Tile() for i in range(LEN)] for j in range(HEIGHT)]
+
+    # update locations
     for j in range(HEIGHT):
         for i in range(LEN):
             tile = board[j][i]
-            tile.value = -1
-            tile.loc = Coord()
-            tile.checked = False
             tile.loc.x = int(TRX_INIT + i*XOFFSET)
             tile.loc.y = int(TRY_INIT + j*YOFFSET)
-            tile.covered = True
     return board
 
 def check_square_loc(board,x,y):
@@ -156,6 +170,11 @@ def check_square_loc(board,x,y):
     pyautogui.moveTo(board[y][x].loc.x, board[y][x].loc.y)
 
 def scan(board):
+    """
+    takes a board object and updates tile info based on the game on screen
+    returns the same board with updated tiles
+    """
+
     # take screenshot of board
     # checking screenshots is ~100-1000x faster than making checks to the screen
     img = pyautogui.screenshot()
@@ -182,7 +201,16 @@ def scan(board):
     return board
 
 def get_neighbors(i,j):
+    """
+    i,j: integers
+    for a tile in the ith column and jth row (0-indexing), returns the valid
+    x,y pairs for the 8 neighboring tiles
+    """
+
     ret = []
+
+    # set the range of x based on i
+    # if i is on an edge, only go up to the edge
     if i == 0:
         start_x = 0
         end_x = i+1
@@ -193,6 +221,7 @@ def get_neighbors(i,j):
         start_x = i-1
         end_x = i+1
 
+    # set the range of y based on j
     if j == 0:
         start_y = j
         end_y = j+1
@@ -203,6 +232,7 @@ def get_neighbors(i,j):
         start_y = j-1
         end_y =j+1
 
+    # add all valid x,y pairs to 
     for y in range(start_y, end_y+1):
         for x in range(start_x, end_x+1):
             if not (x == i and y == j):
@@ -212,14 +242,25 @@ def get_neighbors(i,j):
 
 #takes a board and returns matrix for unknown squares in ROE form, and dictionary of values
 def create_mat(board):
+    """
+    board: 2D array of tiles
+    creates a dictionary to map tiles on the board to columns in a matrix.
+    goes over the whole board, and for each numbered square, adds a row to a
+    matrix with total number of mines (the number) in the last column, and
+    a 1 in each column for each adjacent, uncovered tile (according to the map)
+    returns the matrix in ROE, RROE form, and the dictionary
+    """
+
     dic = {}
     idx = 0
+    
+    # first create the dictionary by looping over all tiles
     for j in range(HEIGHT):
         for i in range(LEN):
             tile = board[j][i]
             val = tile.value
 
-            if val == -1 or val == 0 or tile.checked:
+            if val == COVERED or val == BLANK or tile.checked:
                 continue
 
             adj = get_neighbors(i,j)
@@ -251,10 +292,7 @@ def create_mat(board):
             row[-1] = val
             mat = np.vstack([mat,row])
 
-    # print(dic)
-    # print(row_echelon_form(mat))
-    # print(mat)
-    return np.array(sympy.Matrix(mat).rref()[0]).astype(np.float64), dic
+    return row_echelon_form(mat), np.array(sympy.Matrix(mat).rref()[0]).astype(np.float64), dic
 
 # gets the loc in an x,y pair fron dic using the value
 def get_key(val, dic):
