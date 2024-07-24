@@ -1,4 +1,5 @@
 import pyautogui
+import time
 
 import math
 import numpy as np
@@ -248,7 +249,7 @@ def create_mat(board):
     goes over the whole board, and for each numbered square, adds a row to a
     matrix with total number of mines (the number) in the last column, and
     a 1 in each column for each adjacent, uncovered tile (according to the map)
-    returns the matrix in ROE, RROE form, and the dictionary
+    returns the matrix in REF, RREF form, and the dictionary
     """
 
     dic = {}
@@ -301,38 +302,84 @@ def get_key(val, dic):
         if val == value:
             return key[0], key[1]
         
-# takes ROE matrix, board and dictionary to get mines from matrix, sets board values accordingly
-def find_mines(mat, board, dic):
+# takes ref matrix, board and dictionary to get mines from matrix, sets board values accordingly
+def find_mines(ref, mat, board, dic):
+    # start = time.process_time_ns()
     nrows, ncols = mat.shape
     # print(nrows)
 
     mines = []
     clear = []
 
-    for row in mat:
-        val = row[-1]
-        maxv = 0
-        minv = 0
-        for i in range(ncols-1):
-            if row[i] > 0: maxv += row[i]
-            elif row[i] < 0: minv += row[i]
+    # for row in mat:
+    #     val = row[-1]
+    #     maxv = 0
+    #     minv = 0
+    #     for i in range(ncols-1):
+    #         if row[i] > 0: maxv += row[i]
+    #         elif row[i] < 0: minv += row[i]
 
-        if val == maxv:
-            # all +ve numbers are mines, -ve numbers are not
-            for i in range(ncols-1):
-                if row[i] > 0: mines.append(i)
-                elif row[i] < 0: clear.append(i)
+    #     if val == maxv:
+    #         # all +ve numbers are mines, -ve numbers are not
+    #         for i in range(ncols-1):
+    #             if row[i] > 0: mines.append(i)
+    #             elif row[i] < 0: clear.append(i)
 
-        elif val == minv:
-            # all +ve numbers are not mines, -ve numbers are
-            for i in range(ncols-1):
-                if row[i] > 0: clear.append(i)
-                elif row[i] < 0: mines.append(i)
+    #     elif val == minv:
+    #         # all +ve numbers are not mines, -ve numbers are
+    #         for i in range(ncols-1):
+    #             if row[i] > 0: clear.append(i)
+    #             elif row[i] < 0: mines.append(i)
     
     # print(mines)
     # print(clear)
     # return
 
+    rows, cols = ref.shape
+    to_check = np.empty((0, cols))
+    for row in ref:
+        # skip rows with no info
+        if np.sum(row) == 0:
+            continue
+        to_check = np.vstack((to_check, row))
+
+    # keep looping over until no changes made (no new info)
+    while True:
+        original = mines + clear
+
+        for row in to_check:
+            val = row[-1]
+
+            if val == 0:
+                # all 1's are clear
+                for i in range(cols):
+                    if row[i]: #non-zero
+                        if i not in clear: clear.append(i)
+                # to_check = np.delete(to_check, (0), axis = 0) #delete rows with no more info?
+            
+            else:
+                squares = row[:-1]
+                checking = []
+
+                for i in range(cols-1):
+                    # check all non-zeros
+                    curr = squares[i]
+                    if curr and (i not in clear): 
+                        if i not in mines: checking.append(i)
+                        else: val -= 1
+
+                if val == 0:
+                    for i in checking:
+                        clear.append(i)
+
+                elif len(checking) == val:
+                    for i in checking:
+                        mines.append(i)
+
+        if mines + clear == original:
+            break
+    
+    pyautogui.screenshot('test.png')
     # click all the clear squares
     clear = list(dict.fromkeys(clear))
     for i in clear:
@@ -349,6 +396,7 @@ def find_mines(mat, board, dic):
         x,y = get_key(i, dic)
         board[y][x].value = -2
         
+    # print(time.process_time_ns() - start)
 
 
 
