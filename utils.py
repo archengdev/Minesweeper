@@ -9,6 +9,7 @@ import sympy as sympy
 from row_echelon import *
 
 pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 
 class Coord:
     x: int
@@ -31,8 +32,8 @@ class Tile:
 
 # prompt user to choose mode
 # mode = pyautogui.prompt("easy_half or hard_full")
-# mode = 'easy_half'
-mode = 'hard_full'
+mode = 'easy_half'
+# mode = 'hard_full'
 
 
 # set pixel locations. using 2560x1440, 125% scale
@@ -185,8 +186,8 @@ def scan(board):
         for i in range(LEN):
             tile = board[j][i]
 
-            # if tile is not covered, no need to check again
-            if not tile.covered:
+            # if tile is not covered, or is a bomb, no need to check again
+            if not tile.covered or tile.value == BOMB:
                 continue
 
             # get rgb color of the tile
@@ -199,7 +200,7 @@ def scan(board):
                 tile.covered = False
                 num = check_num(loc, img)
                 board[j][i].value = num
-    return board
+    # return board
 
 def get_neighbors(i,j):
     """
@@ -249,159 +250,105 @@ def create_mat(board):
     goes over the whole board, and for each numbered square, adds a row to a
     matrix with total number of mines (the number) in the last column, and
     a 1 in each column for each adjacent, uncovered tile (according to the map)
-    returns the matrix in REF, RREF form, and the dictionary
+    returns the matrix in RREF form, and the dictionary
     """
 
-    dic = {}
+    # dic: a dictionary that maps x,y locations on the board to unique indices
+    # each tile in the dic will be 
+    dic = {} 
     idx = 0
     
-    # first create the dictionary by looping over all tiles
+    # first create the dictionary by looping over all tiles, and adding an 
+    # uncovered tile to the dic if it is adjacent to a numbered tile
     for j in range(HEIGHT):
         for i in range(LEN):
             tile = board[j][i]
             val = tile.value
 
-            if val == COVERED or val == BLANK or tile.checked:
+            # we only want numbered tiles
+            if val < 1:
                 continue
 
-            adj = get_neighbors(i,j)
+            # for each numbered tile, add all adjacent covered tiles
+            adj = get_neighbors(i,j)    # get list of adjacent tiles
             for (x,y) in adj:
-
-                curr = board[y][x]
-                if curr.value == -1:
+                # only add if covered
+                if board[y][x].value == COVERED:
                     if (x,y) not in dic:
                         dic[(x,y)] = idx
-                        idx += 1
-
+                        idx += 1  # increment idx so each tile is unique
+    
+    # initialize matrix according to how many covered tiles are in the dic
     mat_len = len(dic) + 1
     mat = np.empty((0,mat_len))
 
+    # loop over all tiles again
     for j in range(HEIGHT):
         for i in range(LEN):
             tile = board[j][i]
             val = tile.value
 
-            if val < 1 or tile.checked:
+            # only want numbered tiles
+            if val < 1:
                 continue
 
+            # get adjacent tiles, initialize row represnting info from the tile
             adj = get_neighbors(i,j)
             row = [0 for i in range(mat_len)]
+
             for (x,y) in adj:
                 if (x,y) in dic:
+                    # if tile is in dic, it is unknown, so set that col to 1
                     row[dic[(x,y)]] = 1
             
+            # final column represents number of tile
             row[-1] = val
+
+            # add the row to the matrix
             mat = np.vstack([mat,row])
 
-    return row_echelon_form(mat), np.array(sympy.Matrix(mat).rref()[0]).astype(np.float64), dic
+    # return the matrix in rref form and the dictionary
+    # rref: numpy mat -> sympy mat -> rref sympy mat -> rref numpy mat
+    return np.array(sympy.Matrix(mat).rref()[0]).astype(np.float64), dic
 
-# gets the loc in an x,y pair fron dic using the value
+
 def get_key(val, dic):
-   
+    # gets the loc in an x,y pair fron dic using the value
     for key, value in dic.items():
         if val == value:
             return key[0], key[1]
         
 # takes ref matrix, board and dictionary to get mines from matrix, sets board values accordingly
-def find_mines(ref, mat, board, dic):
+def find_mines(mat, board, dic):
     # start = time.process_time_ns()
     nrows, ncols = mat.shape
     # print(nrows)
 
-    mines = []
+    # mines = []
     clear = []
 
-    # for row in mat:
-    #     val = row[-1]
-    #     maxv = 0
-    #     minv = 0
-    #     for i in range(ncols-1):
-    #         if row[i] > 0: maxv += row[i]
-    #         elif row[i] < 0: minv += row[i]
+    for row in mat:
+        val = row[-1]
+        maxv = 0
+        minv = 0
+        for i in range(ncols-1):
+            if row[i] > 0: maxv += row[i]
+            elif row[i] < 0: minv += row[i]
 
-    #     if val == maxv:
-    #         # all +ve numbers are mines, -ve numbers are not
-    #         for i in range(ncols-1):
-    #             if row[i] > 0: mines.append(i)
-    #             elif row[i] < 0: clear.append(i)
+        if val == maxv:
+            # all +ve numbers are mines, -ve numbers are not
+            for i in range(ncols-1):
+                if row[i] < 0: clear.append(i)
 
-    #     elif val == minv:
-    #         # all +ve numbers are not mines, -ve numbers are
-    #         for i in range(ncols-1):
-    #             if row[i] > 0: clear.append(i)
-    #             elif row[i] < 0: mines.append(i)
-    
-    # print(mines)
-    # print(clear)
-    # return
+        elif val == minv:
+            # all +ve numbers are not mines, -ve numbers are
+            for i in range(ncols-1):
+                if row[i] > 0: clear.append(i)
 
-    rows, cols = ref.shape
-    to_check = np.empty((0, cols))
-    for row in ref:
-        # skip rows with no info
-        if np.sum(row) == 0:
-            continue
-        to_check = np.vstack((to_check, row))
 
-    # keep looping over until no changes made (no new info)
-    while True:
-        original = mines + clear
-
-        for row in to_check:
-            val = row[-1]
-
-            if val == 0:
-                # all 1's are clear
-                for i in range(cols):
-                    if row[i]: #non-zero
-                        if i not in clear: clear.append(i)
-                # to_check = np.delete(to_check, (0), axis = 0) #delete rows with no more info?
-            
-            else:
-                squares = row[:-1]
-                checking = []
-
-                for i in range(cols-1):
-                    # check all non-zeros
-                    curr = squares[i]
-                    if curr and (i not in clear): 
-                        if i not in mines: checking.append(i)
-                        else: val -= 1
-
-                if val == 0:
-                    for i in checking:
-                        clear.append(i)
-
-                elif len(checking) == val:
-                    for i in checking:
-                        mines.append(i)
-
-        if mines + clear == original:
-            break
-    
-    pyautogui.screenshot('test.png')
     # click all the clear squares
     clear = list(dict.fromkeys(clear))
     for i in clear:
         x,y = get_key(i, dic)
         tile = board[y][x]
-        loc = tile.loc
-        x = loc.x
-        y = loc.y
-        pyautogui.click(x,y)
-
-        # update board info ?
-    mines = list(dict.fromkeys(mines))
-    for i in mines:
-        x,y = get_key(i, dic)
-        board[y][x].value = -2
-        
-    # print(time.process_time_ns() - start)
-
-
-
-def check_squares_around(dic):
-    board = init_board()
-    for (x,y) in dic:
-        board[y][x].value = 1
-    print_board(board)
+        pyautogui.click(tile.loc.x,tile.loc.y)
