@@ -31,13 +31,21 @@ class Tile:
     checked: bool
 
 # prompt user to choose mode
-# mode = pyautogui.prompt("easy_half or hard_full")
-mode = 'easy_half'
-# mode = 'hard_full'
+mode = pyautogui.prompt("easy_half or hard_full. press q to end")
+
+# error if mode not supported
+SUPPORTED_MODES = ['easy_half', 'hard_full']
+if mode not in SUPPORTED_MODES:
+    pyautogui.alert("Error: Mode not supported. Enter easy_half or hard_full")
+    quit()
 
 
 # set pixel locations. using 2560x1440, 125% scale
 if mode == 'hard_full':
+    # starting click:
+    pyautogui.click(1300,800)
+    time.sleep(0.5)  # pause to let animations finish
+
     LEN = 24
     HEIGHT = 20
 
@@ -48,6 +56,9 @@ if mode == 'hard_full':
     TRY = 499 # y coord of top left of top left square
 
 elif mode == 'easy_half':
+    pyautogui.click(1900,800)
+    time.sleep(0.5)
+
     LEN = 10
     HEIGHT = 8
 
@@ -320,17 +331,24 @@ def get_key(val, dic):
         
 # takes ref matrix, board and dictionary to get mines from matrix, sets board values accordingly
 def find_mines(mat, board, dic):
-    # start = time.process_time_ns()
-    nrows, ncols = mat.shape
-    # print(nrows)
+    """
+    mat: RREF matrix
+    board: 2D array of tiles
+    dic: map of matrix column number to x,y position in the board
+    gets the clear tiles from the matrix, and clicks on them
+    """
+    _, ncols = mat.shape
 
-    # mines = []
+    # save clear tiles
     clear = []
 
+    # logic from massaioli.wordpress.com/2013/01/12/solving-minesweeper-with-matricies/
     for row in mat:
         val = row[-1]
         maxv = 0
         minv = 0
+
+        # figure out max and min vals for each row
         for i in range(ncols-1):
             if row[i] > 0: maxv += row[i]
             elif row[i] < 0: minv += row[i]
@@ -346,7 +364,7 @@ def find_mines(mat, board, dic):
                 if row[i] > 0: clear.append(i)
 
 
-    # click all the clear squares
+    # get pixel location of, and click all the clear squares
     clear = list(dict.fromkeys(clear))
     for i in clear:
         x,y = get_key(i, dic)
