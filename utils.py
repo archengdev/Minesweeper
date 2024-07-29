@@ -5,11 +5,8 @@ import math
 import numpy as np
 import sympy as sympy
 
-
-from row_echelon import *
-
 pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.05
+pyautogui.PAUSE = 0
 
 class Coord:
     x: int
@@ -44,7 +41,6 @@ if mode not in SUPPORTED_MODES:
 if mode == 'hard_full':
     # starting click:
     pyautogui.click(1300,800)
-    time.sleep(0.5)  # pause to let animations finish
 
     LEN = 24
     HEIGHT = 20
@@ -57,7 +53,6 @@ if mode == 'hard_full':
 
 elif mode == 'easy_half':
     pyautogui.click(1900,800)
-    time.sleep(0.5)
 
     LEN = 10
     HEIGHT = 8
