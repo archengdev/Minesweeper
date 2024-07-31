@@ -1,8 +1,6 @@
 from utils import *
 import keyboard
 
-time.sleep(0.7)
-
 while True:
     # create board, then scan board, then make and use matrix to clear board
     board = init_board()

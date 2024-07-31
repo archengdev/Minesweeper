@@ -18,14 +18,10 @@ BLANK = 0
 
 class Tile:
     def __init__(self):
-        self.value = -1
+        self.value = COVERED
         self.loc = Coord()
-        self.checked = False
-        self.covered = True
     loc: Coord
     value: int # -2 = bomb, -1 = covered, 0 = blank, number is number
-    covered: bool
-    checked: bool
 
 # prompt user to choose mode
 mode = pyautogui.prompt("easy_half or hard_full. press q to end")
@@ -193,7 +189,7 @@ def scan(board):
             tile = board[j][i]
 
             # if tile is not covered, or is a bomb, no need to check again
-            if not tile.covered or tile.value == BOMB:
+            if not tile.value == COVERED or tile.value == BOMB:
                 continue
 
             # get rgb color of the tile
@@ -203,7 +199,6 @@ def scan(board):
 
             # check if tile is still covered, if not, update info
             if not covered(r,g,b):
-                tile.covered = False
                 num = check_num(loc, img)
                 board[j][i].value = num
     # return board
